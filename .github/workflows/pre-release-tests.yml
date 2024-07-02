@@ -1,0 +1,33 @@
+# Testing the code base against the Meilisearch pre-releases
+name: Pre-Release Tests
+
+# Will only run for PRs and pushes to bump-meilisearch-v*
+on:
+  push:
+    branches:
+      - bump-meilisearch-v*
+  pull_request:
+    branches:
+      - bump-meilisearch-v*
+
+jobs:
+  integration-tests:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [
+          '2.12'
+        ]
+    name: integration-tests-against-rc (dart ${{ matrix.version }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Get the latest Meilisearch RC
+        run: echo "MEILISEARCH_VERSION=$(curl https://raw.githubusercontent.com/meilisearch/integration-guides/main/scripts/get-latest-meilisearch-rc.sh | bash)" >> $GITHUB_ENV
+      - name: Meilisearch (${{ env.MEILISEARCH_VERSION }}) setup with Docker
+        run: docker run -d -p 7700:7700 getmeili/meilisearch:${{ env.MEILISEARCH_VERSION }} ./meilisearch --master-key=masterKey --no-analytics
+      - name: Run integration tests
+        run: docker run --net="host" -v $PWD:/package -w /package google/dart:${{ matrix.version }} /bin/sh -c 'pub get && pub run test'
+

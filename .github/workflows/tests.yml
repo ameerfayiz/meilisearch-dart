@@ -1,0 +1,59 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    # trying and staging branches are for BORS config
+    branches:
+      - trying
+      - staging
+      - main
+
+jobs:
+  integration-tests:
+    # Will not run if the event is a PR to bump-meilisearch-v* (so a pre-release PR)
+    # Will still run for each push to bump-meilisearch-v*
+    if: github.event_name != 'pull_request' || !startsWith(github.base_ref, 'bump-meilisearch-v')
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [
+          '2.12'
+        ]
+    name: integration-tests (dart ${{ matrix.version }})
+    container:
+      image: google/dart:${{ matrix.version }}
+    services:
+      meilisearch:
+        image: getmeili/meilisearch:latest
+        env:
+          MEILI_MASTER_KEY: 'masterKey'
+          MEILI_NO_ANALYTICS: 'true'
+        ports:
+          - '7700:7700'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install dependencies
+        run: pub get
+      - name: Run integration tests
+        run: pub run test
+        env:
+          MEILI_SERVER: http://meilisearch:7700
+
+  linter:
+    name: linter-check
+    runs-on: ubuntu-latest
+    container:
+      image: google/dart:2.12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install dependencies
+        run: pub get
+      - name: Run linter
+        uses: zgosalvez/github-actions-analyze-dart@v1
+        with:
+          fail-on-warnings: true
